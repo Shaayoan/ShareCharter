@@ -1,0 +1,42 @@
+def sma_crossover(close, fast=20, slow=50):
+    if len(close) < slow:
+        return False
+    sma_fast = close.rolling(fast).mean()
+    sma_slow = close.rolling(slow).mean()
+    return sma_fast.iloc[-1] > sma_slow.iloc[-1]
+
+
+def rsi_below(close, period=14, threshold=30):
+    delta = close.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.iloc[-1] < threshold
+
+
+def ema_20_50_crossover_rsi_volume(close, volume):
+    latest_ema20 = ema(close, 20).iloc[-1]
+    latest_ema50 = ema(close, 50).iloc[-1]
+    prev_ema20 = ema(close, 20).iloc[-2]
+    prev_ema50 = ema(close, 50).iloc[-2]
+    latest_rsi = rsi(close, 14).iloc[-1]
+    latest_vol = volume.iloc[-1]
+
+    return (latest_ema20 > latest_ema50
+            and prev_ema20 <= prev_ema50
+            and latest_rsi > 60
+            and latest_vol > 100000)
+
+def ema_50_200_long_term_rsi_volume(close, volume):
+    latest_ema50 = ema(close, 50).iloc[-1]
+    latest_ema200 = ema(close, 200).iloc[-1]
+    prev_ema50 = ema(close, 50).iloc[-2]
+    prev_ema200 = ema(close, 200).iloc[-2]
+    latest_rsi = rsi(close, 14).iloc[-1]
+    latest_vol = volume.iloc[-1]
+
+    return (latest_ema50 > latest_ema200
+            and prev_ema50 <= prev_ema200
+            and latest_rsi > 60
+            and latest_vol > 100000)
