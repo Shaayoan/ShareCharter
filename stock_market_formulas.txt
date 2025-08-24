@@ -40,3 +40,44 @@ def ema_50_200_long_term_rsi_volume(close, volume):
             and prev_ema50 <= prev_ema200
             and latest_rsi > 60
             and latest_vol > 100000)
+
+def bollinger_breakout(close, period=20, std_dev=2):
+    sma_mid = close.rolling(period).mean()
+    rolling_std = close.rolling(period).std()
+    upper_band = sma_mid + std_dev * rolling_std
+    lower_band = sma_mid - std_dev * rolling_std
+
+    # Signal: price closes above upper band (buy) or below lower band (sell)
+    return close.iloc[-1] > upper_band.iloc[-1]
+
+def macd_crossover(close, fast=12, slow=26, signal=9):
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+
+    # Signal: MACD crosses above signal line
+    return macd_line.iloc[-1] > signal_line.iloc[-1] and macd_line.iloc[-2] <= signal_line.iloc[-2]
+
+def rsi_overbought(close, period=14, threshold=70):
+    delta = close.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi.iloc[-1] > threshold
+
+def ema_volume_spike(close, volume, ema_period=20, volume_multiplier=2):
+    latest_ema = close.ewm(span=ema_period, adjust=False).mean().iloc[-1]
+    latest_vol = volume.iloc[-1]
+    avg_vol = volume.rolling(ema_period).mean().iloc[-1]
+
+    return close.iloc[-1] > latest_ema and latest_vol > avg_vol * volume_multiplier
+
+def triple_ema_trend(close):
+    ema_10 = close.ewm(span=10, adjust=False).mean().iloc[-1]
+    ema_20 = close.ewm(span=20, adjust=False).mean().iloc[-1]
+    ema_50 = close.ewm(span=50, adjust=False).mean().iloc[-1]
+
+    return ema_10 > ema_20 > ema_50  # strong upward trend
