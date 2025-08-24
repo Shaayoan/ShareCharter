@@ -74,71 +74,74 @@ volume_data = data["Volume"]
 
 # Load formulas
 formulas = load_formulas(FORMULA_FILE)
-if CHOSEN_FORMULA is None:
-    print("Available formulas:", list(formulas.keys()))
-    chosen_name = input("Choose formula: ").strip()
-else:
-    chosen_name = CHOSEN_FORMULA
 
-if chosen_name not in formulas:
-    raise ValueError(f"Formula '{chosen_name}' not found. Available: {list(formulas.keys())}")
+while True:
+    print("\nAvailable formulas:", list(formulas.keys()))
+    chosen_name = input("Choose formula (or type 'exit' to quit): ").strip()
 
-formula_func = formulas[chosen_name]
-sig = inspect.signature(formula_func)
-needed_params = list(sig.parameters.keys())
+    if chosen_name.lower() == "exit":
+        print("Exiting...")
+        break
 
-results = []
-
-# Step 4: Apply chosen formula
-for ticker in close_data.columns:
-    symbol = ticker.replace(".NS", "")
-
-    hist = pd.concat([
-        open_data[ticker].rename("open"),
-        high_data[ticker].rename("high"),
-        low_data[ticker].rename("low"),
-        close_data[ticker].rename("close"),
-        volume_data[ticker].rename("volume")
-    ], axis=1).dropna()
-
-    if hist.empty:
+    if chosen_name not in formulas:
+        print(f"XXXXX Formula '{chosen_name}' not found. Try again.")
         continue
 
-    # Build kwargs only for OHLCV
-    argmap = {}
-    for p in needed_params:
-        if p in ["open","high","low","close","volume"]:
-            argmap[p] = hist[p]
+    formula_func = formulas[chosen_name]
+    sig = inspect.signature(formula_func)
+    needed_params = list(sig.parameters.keys())
 
-    try:
-        ok = bool(formula_func(**argmap))
-    except Exception:
-        continue
+    results = []
 
-    if ok:
-        latest_price = hist["close"].iloc[-1]
-        prev_price = hist["close"].iloc[-2] if len(hist) > 1 else latest_price
-        pct_change = ((latest_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0
-        latest_vol = int(hist["volume"].iloc[-1])
+    # Step 4: Apply chosen formula
+    for ticker in close_data.columns:
+        symbol = ticker.replace(".NS", "")
 
-        results.append({
-            "Stock Name": symbol,
-            "% Chg": round(pct_change, 2),
-            "Price": round(float(latest_price), 2),
-            "Volume": latest_vol,
-            "Links": f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}"
-        })
+        hist = pd.concat([
+            open_data[ticker].rename("open"),
+            high_data[ticker].rename("high"),
+            low_data[ticker].rename("low"),
+            close_data[ticker].rename("close"),
+            volume_data[ticker].rename("volume")
+        ], axis=1).dropna()
 
-# Step 5: DataFrame
-df = pd.DataFrame(results)
-if not df.empty:
-    df = df.sort_values(by="Price", ascending=False).reset_index(drop=True)
-    # Add Sr. column starting from 1
-    df.insert(0, "Sr.", range(1, len(df) + 1))
+        if hist.empty:
+            continue
 
-print(f"Stocks satisfying '{chosen_name}' (sorted by latest price):")
-if not df.empty:
-    # Print without the pandas default index
-    print(df.to_string(index=False))
-else:
-    print("No matches.")
+        # Build kwargs only for OHLCV
+        argmap = {}
+        for p in needed_params:
+            if p in ["open","high","low","close","volume"]:
+                argmap[p] = hist[p]
+
+        try:
+            ok = bool(formula_func(**argmap))
+        except Exception:
+            continue
+
+        if ok:
+            latest_price = hist["close"].iloc[-1]
+            prev_price = hist["close"].iloc[-2] if len(hist) > 1 else latest_price
+            pct_change = ((latest_price - prev_price) / prev_price) * 100 if prev_price != 0 else 0
+            latest_vol = int(hist["volume"].iloc[-1])
+
+            results.append({
+                "Stock Name": symbol,
+                "% Chg": round(pct_change, 2),
+                "Price": round(float(latest_price), 2),
+                "Volume": latest_vol,
+                "Links": f"https://www.tradingview.com/chart/?symbol=NSE:{symbol}"
+            })
+
+    # Step 5: DataFrame
+    df = pd.DataFrame(results)
+    if not df.empty:
+        df = df.sort_values(by="Price", ascending=False).reset_index(drop=True)
+        # Add Sr. column starting from 1
+        df.insert(0, "Sr.", range(1, len(df) + 1))
+
+    print(f"\n📊 Stocks satisfying '{chosen_name}' (sorted by latest price):")
+    if not df.empty:
+        print(df.to_string(index=False))
+    else:
+        print("No matches found.")
